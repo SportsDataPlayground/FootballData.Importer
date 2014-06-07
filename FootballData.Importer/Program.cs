@@ -11,11 +11,14 @@ using FootballData.Importer.DTOs;
 using FootballData.Importer.WikiParser;
 using System.Reflection;
 using FootballData.Importer.Interfaces;
+using NLog;
 
 namespace FootballData.Importer
 {
     class Program
     {
+        static Logger logger = LogManager.GetLogger("Program");
+
         static string OutputFullPath()
         {
             var bin = System.IO.Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
@@ -25,7 +28,7 @@ namespace FootballData.Importer
 
             if (!dir.Exists)
             {
-                Console.WriteLine("Creating dir " + dir.FullName);
+                logger.Info("Creating dir " + dir.FullName);
                 dir.Create();
             }
 
@@ -49,7 +52,7 @@ namespace FootballData.Importer
                 }
                 catch(Exception e)
                 {
-                    Console.WriteLine(e);
+                    logger.Error("failed to import", e);
                 }
             }
 

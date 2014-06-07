@@ -1,5 +1,6 @@
 ﻿using FootballData.Importer.DTOs;
 using FootballData.Importer.Interfaces;
+using NLog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,6 +11,8 @@ namespace FootballData.Importer.WikiParser
 {
     public class WikiWorldCupSquadImporter : IImporter
     {
+        Logger logger = LogManager.GetLogger("WikiWorldCupSquadImporter");
+
         public List<Player> Import()
         {
             var allPlayers = new List<Player>();
@@ -29,8 +32,8 @@ namespace FootballData.Importer.WikiParser
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("Failed to parse " + wc.ToString());
-                    Console.WriteLine(ex);
+                    logger.Info("Failed to parse " + wc.ToString());
+                    logger.Info(ex);
                 }
             }
             return allPlayers;

@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using FootballData.Importer.DTOs;
 using FootballData.Importer.Interfaces;
+using NLog;
 
 namespace FootballData.Importer.WikiParser
 {
@@ -14,6 +15,7 @@ namespace FootballData.Importer.WikiParser
     /// </summary>
     public class WikiSquadParser : IPlayerParser
     {
+        Logger logger = LogManager.GetLogger("WikiSquadParser");
         private Competition _competition;
 
         public WikiSquadParser(Competition competition)
@@ -24,7 +26,7 @@ namespace FootballData.Importer.WikiParser
         public List<Player> Parse(string text)
         {
             text = new string(text.Where(c => !char.IsControl(c)).ToArray());
-            text = WikiSquadParser.NormalizeTemplateNames(text);
+            text = NormalizeTemplateNames(text);
 
             var teams = Regex.Matches(text, "==([^=]+)==")
                 .Cast<Match>()
@@ -48,40 +50,40 @@ namespace FootballData.Importer.WikiParser
                         .Substring(startIndex, endIndex - startIndex)
                         .Replace(start, "").Replace(end, "");
 
-                    var teamName = WikiSquadParser.GetTeamName(m.Value);
+                    var teamName = GetTeamName(m.Value);
                     actualTeams.Add(teamName);
-                    var players = WikiSquadParser.Parse(innerData, teamName);
+                    var players = Parse(innerData, teamName);
                     allPlayers.AddRange(players);
                 }
                 else
                 {
-                    Console.WriteLine("Skipping match " + m.Value);
+                    logger.Info("Skipping match " + m.Value);
                 }
             }
 
             var invalids = allPlayers.Where(x => !x.IsValid()).ToList();
-            //invalids.ForEach(Console.WriteLine);
+            //invalids.ForEach(logger.Info);
 
-            Console.WriteLine("");
-            Console.WriteLine(" -- " + _competition.ToString());
+            logger.Info("");
+            logger.Info(" -- " + _competition.ToString());
 
             if (_competition.NumberOfTeams != actualTeams.Count)
-                Console.WriteLine("**********MISMATCH for " + _competition.ToString());
+                logger.Info("**********MISMATCH for " + _competition.ToString());
 
-            Console.WriteLine(string.Join(",", actualTeams));
-            Console.WriteLine("{0} teams and {1} coaches", actualTeams.Count, coaches.Count);
-            Console.WriteLine("{0} players imported vs {1} estimated with {2} invalids and {3} captains.",
+            logger.Info(string.Join(",", actualTeams));
+            logger.Info("{0} teams and {1} coaches", actualTeams.Count, coaches.Count);
+            logger.Info("{0} players imported vs {1} estimated with {2} invalids and {3} captains.",
                 allPlayers.Count, actualTeams.Count * 23, invalids.Count, allPlayers.Count(x => x.IsCaptain));
 
             allPlayers.ForEach(p => { p.Year = _competition.Year; p.Competition = "World Cup"; });
             return allPlayers;
         }
 
-        public static List<Player> Parse(string data, string team)
+        public List<Player> Parse(string data, string team)
         {
             var list = new List<Player>();
 
-            var players = data.Split(new [] {"{{nat fs player" }, StringSplitOptions.RemoveEmptyEntries);
+            var players = data.Split(new[] { "{{nat fs player" }, StringSplitOptions.RemoveEmptyEntries);
             foreach (var p in players)
             {
                 var player = new Player
@@ -105,7 +107,7 @@ namespace FootballData.Importer.WikiParser
         // age={{Birth date and age2|2010|6|11|1977|11|25|df=y}}
         // {{Birth date and age2|specified year|specified month|specified day|year of birth|month of birth|day of birth}}
         // {{Birth date and age2|yyyy|mm|dd|yyyy|mm|dd|df=y}}
-        public static string GetBirthdate(string s)
+        public string GetBirthdate(string s)
         {
             var pattern = @"\|\d{4}\|\d+\|\d+\|\d{4}\|\d+\|\d+";
             var match = Regex.Match(s, pattern, RegexOptions.IgnoreCase);
@@ -120,20 +122,20 @@ namespace FootballData.Importer.WikiParser
             return string.Empty;
         }
 
-        public static string GetTeamName(string s)
+        public string GetTeamName(string s)
         {
-            var names = s.Split(new[] { "|", "{{", "}}", "[", "]", "==", "flagicon" }, 
+            var names = s.Split(new[] { "|", "{{", "}}", "[", "]", "==", "flagicon" },
                 StringSplitOptions.RemoveEmptyEntries)
                 .Distinct()
                 .Where(x => !string.IsNullOrWhiteSpace(x) && x != "fb")
                 .ToList();
 
             if (names.Any()) return names.First();
-            
+
             return string.Empty;
         }
 
-        public static bool GetIsCaptain(string s)
+        public bool GetIsCaptain(string s)
         {
             var match = Regex.Match(s, @"\[\[Captain", RegexOptions.IgnoreCase);
             if (match.Success)
@@ -145,7 +147,7 @@ namespace FootballData.Importer.WikiParser
             return false;
         }
 
-        public static string GetNumber(string s)
+        public string GetNumber(string s)
         {
             var match = Regex.Match(s, @"\|no=[ \d]+\|", RegexOptions.IgnoreCase);
             if (match.Success)
@@ -154,7 +156,7 @@ namespace FootballData.Importer.WikiParser
             return string.Empty;
         }
 
-        public static string GetClubNationality(string s)
+        public string GetClubNationality(string s)
         {
             var match = Regex.Match(s, @"\|clubnat=[A-Za-z ]+", RegexOptions.IgnoreCase);
             if (match.Success)
@@ -164,7 +166,7 @@ namespace FootballData.Importer.WikiParser
         }
 
         // club=[[Orlando Pirates FC|Orlando Pirates]]|clubnat=RSA
-        public static string GetClub(string s)
+        public string GetClub(string s)
         {
             try
             {
@@ -201,14 +203,14 @@ namespace FootballData.Importer.WikiParser
 
                 return string.Empty;
             }
-            catch(Exception e)
+            catch (Exception e)
             {
-                Console.WriteLine(s);
+                logger.Info(s);
             }
             return "";
         }
 
-        public static string GetPosition(string s)
+        public string GetPosition(string s)
         {
             var match = Regex.Match(s, @"\|pos=[A-Z ]+\|", RegexOptions.IgnoreCase);
             if (match.Success)
@@ -220,7 +222,7 @@ namespace FootballData.Importer.WikiParser
         // |name=[[Moeneeb Josephs]]|
         // |name=[[Aaron Mokoena]] ([[Captain (association football)|c]])|
         // |name=[[Matthew Booth (soccer)|Matthew Booth]]|
-        public static string GetName(string s)
+        public string GetName(string s)
         {
             var match = Regex.Match(s, @"\|name=\[\[[\w -\]]+\|", RegexOptions.IgnoreCase);
             if (match.Success)
@@ -232,7 +234,7 @@ namespace FootballData.Importer.WikiParser
             return string.Empty;
         }
 
-        public static string NormalizeTemplateNames(string data)
+        public string NormalizeTemplateNames(string data)
         {
             var newData = data.Replace("{{National football squad", "{{nat fs");
             newData = newData.Replace("==Reserves in stan by==", "");
